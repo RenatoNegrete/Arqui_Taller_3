@@ -54,7 +54,7 @@ public class CoreSystem {
 
     public double constantValue(String token) {
         switch (token.toLowerCase()) {
-            case "pi":
+            case "pi":return Math.PI;
             case "π": return Math.PI;
             case "e": return Math.E;
             default: throw new IllegalArgumentException("Constante desconocida: " + token);
