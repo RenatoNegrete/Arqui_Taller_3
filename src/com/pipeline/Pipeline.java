@@ -12,12 +12,10 @@ public class Pipeline<I, O> {
         return casted;
     }
 
-    @SuppressWarnings({ "unchecked", "rawtypes" })
+    @SuppressWarnings({"unchecked", "rawtypes"})
     public O run(I input) {
         Object current = input;
-        for (Filter f : filters) {
-            current = f.process(current);
-        }
+        for (Filter f : filters) current = f.process(current);
         return (O) current;
     }
 }

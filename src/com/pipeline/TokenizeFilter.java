@@ -6,21 +6,49 @@ public class TokenizeFilter implements Filter<String, List<String>> {
     @Override
     public List<String> process(String input) {
         List<String> tokens = new ArrayList<>();
-        StringBuilder number = new StringBuilder();
-        for (char c : input.toCharArray()) {
+        if (input == null || input.isEmpty()) return tokens;
+
+        int i = 0;
+        int n = input.length();
+
+        while (i < n) {
+            char c = input.charAt(i);
+
+            if (Character.isWhitespace(c)) { i++; continue; }
+
             if (Character.isDigit(c) || c == '.') {
-                number.append(c);
-            } else {
-                if (number.length() > 0) {
-                    tokens.add(number.toString());
-                    number.setLength(0);
+                int start = i;
+                boolean seenDot = (c == '.');
+                i++;
+                while (i < n) {
+                    char d = input.charAt(i);
+                    if (Character.isDigit(d)) { i++; continue; }
+                    if (d == '.' && !seenDot) { seenDot = true; i++; continue; }
+                    break;
                 }
-                if (!Character.isWhitespace(c)) {
-                    tokens.add(String.valueOf(c));
-                }
+                tokens.add(input.substring(start, i));
+                continue;
             }
+
+            if (Character.isLetter(c)) {
+                int start = i;
+                i++;
+                while (i < n && (Character.isLetterOrDigit(input.charAt(i)) || input.charAt(i) == '_')) i++;
+                tokens.add(input.substring(start, i));
+                continue;
+            }
+
+            if (c == 'π') { tokens.add("π"); i++; continue; }
+
+            if ("+-*/^(),".indexOf(c) >= 0) {
+                tokens.add(String.valueOf(c));
+                i++;
+                continue;
+            }
+
+            throw new IllegalArgumentException("Carácter no reconocido: " + c);
         }
-        if (number.length() > 0) tokens.add(number.toString());
+
         return tokens;
     }
 }

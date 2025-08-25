@@ -1,69 +1,75 @@
 package com.pipeline;
 
-import com.core.CoreSystem;
+import com.core.*;
 import java.util.*;
 
 public class Evaluator {
-    private CoreSystem core;
+    private final CoreSystem core;
 
-    public Evaluator(CoreSystem core) {
-        this.core = core;
-    }
+    public Evaluator(CoreSystem core) { this.core = core; }
 
-    // Algoritmo Shunting-yard: convierte de infix -> postfix (RPN)
     public List<String> toRPN(List<String> tokens) {
         List<String> output = new ArrayList<>();
-        Stack<String> operators = new Stack<>();
-
-        Map<String, Integer> precedence = new HashMap<>();
-        precedence.put("+", 1);
-        precedence.put("-", 1);
-        precedence.put("*", 2);
-        precedence.put("/", 2);
+        Deque<String> stack = new ArrayDeque<>();
+        String prevType = null;
 
         for (String token : tokens) {
-            if (token.matches("\\d+(\\.\\d+)?")) {
-                // es número
-                output.add(token);
-            } else if (precedence.containsKey(token)) {
-                // es operador
-                while (!operators.isEmpty() && precedence.containsKey(operators.peek()) &&
-                        precedence.get(operators.peek()) >= precedence.get(token)) {
-                    output.add(operators.pop());
-                }
-                operators.push(token);
-            } else if (token.equals("(")) {
-                operators.push(token);
-            } else if (token.equals(")")) {
-                while (!operators.isEmpty() && !operators.peek().equals("(")) {
-                    output.add(operators.pop());
-                }
-                if (!operators.isEmpty() && operators.peek().equals("(")) {
-                    operators.pop(); // descartar paréntesis
-                }
+            if (isNumber(token)) {
+                output.add(token); prevType = "number"; continue;
             }
-        }
+            if (core.isConstant(token)) {
+                output.add(Double.toString(core.constantValue(token))); prevType = "number"; continue;
+            }
+            if (token.equals("(")) { stack.push(token); prevType = "("; continue; }
+            if (token.equals(")")) {
+                while (!stack.isEmpty() && !stack.peek().equals("(")) output.add(stack.pop());
+                stack.pop();
+                if (!stack.isEmpty() && core.getOperacion(stack.peek()).isFunction()) output.add(stack.pop());
+                prevType = ")"; continue;
+            }
 
-        // Vaciar operadores restantes
-        while (!operators.isEmpty()) {
-            output.add(operators.pop());
-        }
+            // operador o función
+            String opToken = token;
+            if (token.equals("-") && (prevType == null || prevType.equals("operator") || prevType.equals("("))) {
+                opToken = "neg";
+            }
 
+            if (!core.isRegistered(opToken)) throw new IllegalArgumentException("Operación desconocida: " + token);
+
+            Operacion op1 = core.getOperacion(opToken);
+            if (op1.isFunction()) { stack.push(opToken); prevType = "func"; continue; }
+
+            while (!stack.isEmpty() && core.isRegistered(stack.peek())) {
+                Operacion op2 = core.getOperacion(stack.peek());
+                boolean left = op1.getAssociativity() == Operacion.Associativity.LEFT;
+                if ((left && op1.getPrecedence() <= op2.getPrecedence()) ||
+                    (!left && op1.getPrecedence() < op2.getPrecedence())) {
+                    output.add(stack.pop());
+                } else break;
+            }
+            stack.push(opToken);
+            prevType = "operator";
+        }
+        while (!stack.isEmpty()) output.add(stack.pop());
         return output;
     }
 
-    // Evalúa una expresión en RPN
     public double evaluateRPN(List<String> tokens) {
-        Stack<Double> stack = new Stack<>();
+        Deque<Double> stack = new ArrayDeque<>();
         for (String token : tokens) {
-            if (token.matches("\\d+(\\.\\d+)?")) {
-                stack.push(Double.parseDouble(token));
-            } else {
-                double b = stack.pop();
-                double a = stack.pop();
-                stack.push(core.ejecutarOperacion(token, a, b));
-            }
+            if (isNumber(token)) { stack.push(Double.parseDouble(token)); continue; }
+            if (!core.isRegistered(token)) throw new IllegalArgumentException("Token desconocido: " + token);
+
+            Operacion op = core.getOperacion(token);
+            int n = op.getArity();
+            double[] args = new double[n];
+            for (int i = n - 1; i >= 0; i--) args[i] = stack.pop();
+            stack.push(op.ejecutar(args));
         }
         return stack.pop();
+    }
+
+    private boolean isNumber(String s) {
+        try { Double.parseDouble(s); return true; } catch (Exception e) { return false; }
     }
 }
